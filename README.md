@@ -3,7 +3,10 @@
 Simple cordova music player
 
 ## Install:
-- install the plugin
+- install the plugin 
+```bash
+cordova plugin add https://github.com/juicyapp/cordova-plugins-justmusicplayer.git
+```
 
 
 ## Usage:
