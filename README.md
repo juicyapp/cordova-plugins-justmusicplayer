@@ -5,9 +5,11 @@ Simple cordova music player
 ## Install:
 - install the plugin
 
+
 ## Usage:
-- load and play the music
-```
+
+```javascript
+// load and play the music:
 cordova.plugins.JustMusicPlayer.load({
   title: 'music title',
   artist: 'music author',
@@ -21,35 +23,34 @@ function(){
 },
 function(){
   console.log('load failed');
-})
-```
-- pause
-```
+});
+
+// pause
 cordova.plugins.JustMusicPlayer.pause();
-```
-- seekTo
-```
+
+// seekTo
 cordova.plugins.JustMusicPlayer.seekTo(1);
 ```
 
+
+
 ## Events:
-- music is playing
-```
+
+```javascript
+// music is playing
 document.addEventListener('didPlayerPlaying', function(e){
   console.log(e.detail.currentTime, e.detail.duration);
 });
-```
-- music is end
-```
+
+// music is end
 document.addEventListener('didPlayerReachEnd', function(e){
   console.log(e.detail.currentTime, e.detail.duration);
 });
-```
-- "Next Track" clicked on iOS remoteControl
-```
+
+// "Next Track" clicked on iOS remoteControl
 document.addEventListener('didRemoteNextTrack', function(e){});
-```
-- "Previous Track" clicked on iOS remoteControl
-```
+
+// "Previous Track" clicked on iOS remoteControl
 document.addEventListener('didRemotePreviousTrack', function(e){);
+
 ```
