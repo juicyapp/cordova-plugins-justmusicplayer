@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='utf-8'?>
+    <plugin id="org.juicyapp.justmusicplayer" version="0.1.0" xmlns="http://apache.org/cordova/ns/plugins/1.0" xmlns:android="http://schemas.android.com/apk/res/android">
+        <name>JustMusicPlayer</name>
+        <js-module name="JustMusicPlayer" src="www/JustMusicPlayer.js">
+            <clobbers target="cordova.plugins.JustMusicPlayer" />
+        </js-module>
+        <platform name="ios">
+        	
+	        <!-- The app is able to run in background through audio mode -->
+	        <config-file target="*-Info.plist" parent="UIBackgroundModes">
+	            <array>
+	                <string>audio</string>
+	            </array>
+	        </config-file>
+
+	        <!-- The app is able to run in background through audio mode -->
+	        <config-file target="*-Info.plist" parent="NSAppTransportSecurity">
+	            <dict>
+	                <key>NSAllowsArbitraryLoads</key><true/>
+	            </dict>
+	        </config-file>
+
+	        <key>NSAppTransportSecurity</key>
+	        <dict>
+	          <!--Include to allow all connections (DANGER)-->
+	          <key>NSAllowsArbitraryLoads</key>
+	              <true/>
+	        </dict>
+
+			<framework src="AVFoundation.framework" framework="true"/>
+			<framework src="MediaPlayer.framework" framework="true"/>
+
+            <config-file parent="/*" target="config.xml">
+                <feature name="JustMusicPlayer">
+                    <param name="ios-package" value="JustMusicPlayer" />
+                </feature>
+            </config-file>
+            <source-file src="src/ios/JustMusicPlayer.m" />
+
+
+        </platform>
+    </plugin>
