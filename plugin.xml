@@ -38,5 +38,6 @@
             </config-file>
             <config-file parent="/*" target="AndroidManifest.xml"></config-file>
             <source-file src="src/android/JustMusicPlayer.java" target-dir="src/org/juicyapp/justmusicplayer/JustMusicPlayer" />
+            <source-file src="src/android/layout/notification_remote_control.xml" target-dir="res/layout" />
         </platform>
     </plugin>

@@ -1,6 +1,7 @@
 // http://stackoverflow.com/questions/1965784/streaming-audio-from-a-url-in-android-using-mediaplayer
 // http://www.hrupin.com/2011/02/example-of-streaming-mp3-mediafile-with-android-mediaplayer-class
 // http://stackoverflow.com/questions/23443946/music-player-control-in-notification
+// http://www.glowingpigs.com/index.php/extras
 
 package org.juicyapp.justmusicplayer;
 
@@ -24,6 +25,18 @@ import android.media.MediaPlayer.OnBufferingUpdateListener;
 import android.media.MediaPlayer.OnCompletionListener;
 import android.media.MediaPlayer.OnPreparedListener;
 
+import android.content.Context;
+import android.app.Notification.Builder;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.content.res.Resources;
+import android.widget.RemoteViews;
+
+import android.app.PendingIntent;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.BroadcastReceiver;
+
 /**
  * Android implementation of cordova JustMusicPlayer
  */
@@ -32,23 +45,47 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
     public static final String JS_FUNCTION_NAMESPACE = "cordova.plugins.JustMusicPlayer";
     public static final int PLAYER_TIMER_TICK_INTERVAL = 500;
 
+    public static final String REMOTE_CONTROL_PREVIOUS = "org.juicyapp.justmusicplayer.REMOTE_CONTROL_PREVIOUS";
+    public static final String REMOTE_CONTROL_PLAY_PAUSE = "org.juicyapp.justmusicplayer.REMOTE_CONTROL_PLAY_PAUSE";
+    public static final String REMOTE_CONTROL_NEXT = "org.juicyapp.justmusicplayer.REMOTE_CONTROL_NEXT";
+
+    public static final int REMOTE_CONTROL_NOTIFICATION_ID = 1000;
+
     private MediaPlayer mediaPlayer;
     private CallbackContext currentPlayerLoadCallbackContext;
-    private Timer timer;
 
-    private TimerTask timerTask = new TimerTask() {
+    private Timer timer;
+    private TimerTask timerTask;
+
+    private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
         @Override
-        public void run() {
-            // http://stackoverflow.com/questions/22607657/webview-methods-on-same-thread-error
-            webView.getView().post(new Runnable() {
-                @Override
-                public void run() {
-                    int currentTime = mediaPlayer.getCurrentPosition();
-                    int duration = mediaPlayer.getDuration();
-                    String jsCallback = JS_FUNCTION_NAMESPACE + ".didPlayerPlaying(" + currentTime + ", " + duration + ");";
-                    webView.loadUrl("javascript:" + jsCallback);
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+
+            if (action.equals(REMOTE_CONTROL_PREVIOUS)) {
+
+                String jsCallback = JS_FUNCTION_NAMESPACE + ".didRemoteNextTrack();";
+                webView.loadUrl("javascript:" + jsCallback);
+
+            } else if (action.equals(REMOTE_CONTROL_PLAY_PAUSE)) {
+
+                if(mediaPlayer.isPlaying()) {
+                    mediaPlayer.pause();
+                    stopTimer();
+                } else {
+                    if (mediaPlayer.getCurrentPosition() >= mediaPlayer.getDuration()) {
+                        mediaPlayer.seekTo(0);
+                    }
+                    mediaPlayer.start();
+                    startTimer();
                 }
-            });
+
+            } else if (action.equals(REMOTE_CONTROL_NEXT)) {
+
+                String jsCallback = JS_FUNCTION_NAMESPACE + ".didRemotePreviousTrack();";
+                webView.loadUrl("javascript:" + jsCallback);
+
+            }
         }
     };
 
@@ -57,6 +94,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
     public void initialize(CordovaInterface cordova, CordovaWebView webView) {
         super.initialize(cordova, webView);
         // your init code here
+        Context applicationContest = cordova.getActivity().getApplicationContext();
 
         // init mediaPlayer
         mediaPlayer = new MediaPlayer();
@@ -65,8 +103,13 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
         mediaPlayer.setOnPreparedListener(this);
         mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
 
-        // init timer
-        timer = new Timer();
+        // register remote event for notification
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addCategory(Intent.CATEGORY_DEFAULT);
+        intentFilter.addAction(REMOTE_CONTROL_PREVIOUS);
+        intentFilter.addAction(REMOTE_CONTROL_PLAY_PAUSE);
+        intentFilter.addAction(REMOTE_CONTROL_NEXT);
+        applicationContest.registerReceiver(broadcastReceiver, intentFilter);
     }
 
     // media player callbacks
@@ -92,14 +135,31 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
      * timer control
      */
     private void startTimer(){
+        
+        timer = new Timer();
+        timerTask = new TimerTask() {
+            @Override
+            public void run() {
+                // http://stackoverflow.com/questions/22607657/webview-methods-on-same-thread-error
+                webView.getView().post(new Runnable() {
+                    @Override
+                    public void run() {
+                        int currentTime = mediaPlayer.getCurrentPosition();
+                        int duration = mediaPlayer.getDuration();
+                        String jsCallback = JS_FUNCTION_NAMESPACE + ".didPlayerPlaying(" + currentTime + ", " + duration + ");";
+                        webView.loadUrl("javascript:" + jsCallback);
+                    }
+                });
+            }
+        };
+
         timer.scheduleAtFixedRate(timerTask, PLAYER_TIMER_TICK_INTERVAL, PLAYER_TIMER_TICK_INTERVAL);
     }
-
-    /**
-     * timer control
-     */
     private void stopTimer() {
-        timer.cancel();
+        if (timer != null) {
+            timer.cancel();
+            timer.purge();
+        }
     }
 
     @Override
@@ -113,12 +173,12 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
 
         if (action.equals("load")) {
             this.load(
-                args.getString(0),
-                args.getString(1),
-                args.getString(2),
-                args.getString(3),
-                args.getString(4),
-                callbackContext);
+                    args.getString(0),
+                    args.getString(1),
+                    args.getString(2),
+                    args.getString(3),
+                    args.getString(4),
+                    callbackContext);
             return true;
         }
         if (action.equals("play")) {
@@ -159,6 +219,8 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
             callbackContext.error("");
             currentPlayerLoadCallbackContext = null;
         }
+
+        showRemoteControlNotifications();
     }
 
     /**
@@ -167,6 +229,10 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
      */
     private void play(CallbackContext callbackContext) {
         try {
+
+            if (mediaPlayer.getCurrentPosition() >= mediaPlayer.getDuration()) {
+                mediaPlayer.seekTo(0);
+            }
             mediaPlayer.start();
             startTimer();
             callbackContext.success();
@@ -216,5 +282,60 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
             callbackContext.error(e.getMessage());
         }
     }
+
+    /*----------------------
+        Music remote control
+        notifications
+     ----------------------*/
+    /**
+     * create custom notification
+     */
+    private void showRemoteControlNotifications() {
+
+        Context applicationContest = cordova.getActivity().getApplicationContext();
+        Resources applicationResources = applicationContest.getResources();
+        String packageName = applicationContest.getPackageName();
+
+        // remote control view
+        // http://stackoverflow.com/questions/19978849/phonegap-plugin-activity-import-layout
+        int layoutIdentifier =  applicationResources.getIdentifier("notification_remote_control", "layout", packageName);
+        RemoteViews remoteViews = new RemoteViews(packageName, layoutIdentifier);
+
+        // notification builder
+        Builder builder = new Builder(applicationContest)
+                .setSmallIcon(applicationContest.getApplicationInfo().icon)
+                .setAutoCancel(true)
+                .setContent(remoteViews);
+
+        // intent action for clicking previous
+        remoteViews.setOnClickPendingIntent(
+                applicationResources.getIdentifier("remote_button_previous", "id", packageName),
+                createPendingIntentAction(applicationContest, REMOTE_CONTROL_PREVIOUS));
+
+        // intent action for clicking next
+        remoteViews.setOnClickPendingIntent(
+                applicationResources.getIdentifier("remote_button_next", "id", packageName),
+                createPendingIntentAction(applicationContest, REMOTE_CONTROL_NEXT));
+
+        // intent action for clicking previous
+        remoteViews.setOnClickPendingIntent(
+                applicationResources.getIdentifier("remote_button_play_pause", "id", packageName),
+                createPendingIntentAction(applicationContest, REMOTE_CONTROL_PLAY_PAUSE));
+
+        NotificationManager notificationManager = (NotificationManager)applicationContest.getSystemService(
+                android.content.Context.NOTIFICATION_SERVICE);
+
+        Notification notification = builder.build();
+        // http://stackoverflow.com/questions/25447467/bigcontentview-in-android-notification-4-1-in-samsung-tablet
+        // notification.bigContentView = remoteViews;
+        // notification.priority = notification.PRIORITY_MAX;
+        notificationManager.notify(REMOTE_CONTROL_NOTIFICATION_ID, notification);
+    }
+
+    private PendingIntent createPendingIntentAction(Context applicationContest, String actionName) {
+        Intent intent = new Intent(actionName);
+        return PendingIntent.getBroadcast(applicationContest, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+
 
 }
