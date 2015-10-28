@@ -52,6 +52,6 @@ document.addEventListener('didPlayerReachEnd', function(e){});
 document.addEventListener('didRemoteNextTrack', function(e){});
 
 // "Previous Track" clicked on iOS remoteControl
-document.addEventListener('didRemotePreviousTrack', function(e){);
+document.addEventListener('didRemotePreviousTrack', function(e){});
 
 ```
