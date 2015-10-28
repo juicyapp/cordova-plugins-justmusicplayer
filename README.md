@@ -46,9 +46,7 @@ document.addEventListener('didPlayerPlaying', function(e){
 });
 
 // music is end
-document.addEventListener('didPlayerReachEnd', function(e){
-  console.log(e.detail.currentTime, e.detail.duration);
-});
+document.addEventListener('didPlayerReachEnd', function(e){});
 
 // "Next Track" clicked on iOS remoteControl
 document.addEventListener('didRemoteNextTrack', function(e){});
