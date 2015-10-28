@@ -207,8 +207,6 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
         }
     }
 
-
-
     @Override
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext) throws JSONException {
 
@@ -286,7 +284,6 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
             currentPlayerLoadCallbackContext = null;
         }
 
-
     }
 
     /**
@@ -294,11 +291,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
      * @param callbackContext cordova bridge callback
      */
     private void play(CallbackContext callbackContext) {
-        if (mediaPlayer == null){
-            callbackContext.error("no source found");
-        }
         try {
-
             if (mediaPlayer.getCurrentPosition() >= mediaPlayer.getDuration()) {
                 mediaPlayer.seekTo(0);
             }
@@ -316,9 +309,6 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
      * @param callbackContext cordova bridge callback
      */
     private void pause(CallbackContext callbackContext) {
-        if (mediaPlayer == null){
-            callbackContext.error("no source found");
-        }
         try {
             mediaPlayer.pause();
             stopTimer();
@@ -335,9 +325,6 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
      * @param callbackContext cordova bridge callback
      */
     private void seekTo(int time, CallbackContext callbackContext) {
-        if (mediaPlayer == null){
-            callbackContext.error("no source found");
-        }
         try {
             mediaPlayer.seekTo(time);
             callbackContext.success();
@@ -352,9 +339,6 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
      * @param callbackContext cordova bridge callback
      */
     private void setVolume(float volume, CallbackContext callbackContext) {
-        if (mediaPlayer == null){
-            callbackContext.error("no source found");
-        }
         try {
             mediaPlayer.setVolume(volume, volume);
             callbackContext.success();
