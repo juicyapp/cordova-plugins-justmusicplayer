@@ -10,10 +10,6 @@ import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaInterface;
 import org.apache.cordova.CordovaWebView;
 
-import java.io.BufferedInputStream;
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.net.URLConnection;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.io.InputStream;
@@ -36,8 +32,6 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.content.res.Resources;
 import android.widget.RemoteViews;
-import android.widget.Button;
-import android.widget.ImageView;
 
 import android.app.PendingIntent;
 import android.content.Intent;
@@ -45,7 +39,6 @@ import android.content.IntentFilter;
 import android.content.BroadcastReceiver;
 
 import android.os.AsyncTask;
-import android.net.Uri;
 import java.net.URL;
 
 import android.graphics.Bitmap;
@@ -79,15 +72,11 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
 
     private Timer timer;
     private TimerTask timerTask;
-
     private Context applicationContest;
 
     private Builder builder;
     private RemoteViews notificationRemoteControl;
-
     private AlbumAudioInfo currentAlbumAudioInfo = new AlbumAudioInfo();
-
-    private JustMusicPlayerImageDownloadTask imageDownloadTask;
 
     private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
         @Override
@@ -100,6 +89,11 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
                 webView.loadUrl("javascript:" + jsCallback);
 
             } else if (action.equals(REMOTE_CONTROL_PLAY_PAUSE)) {
+
+                if (mediaPlayer == null){
+                    return;
+                }
+
                 if(mediaPlayer.isPlaying()) {
                     mediaPlayer.pause();
                     stopTimer();
@@ -132,14 +126,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
         super.initialize(cordova, webView);
         // your init code here
 
-        // init mediaPlayer
         applicationContest = cordova.getActivity().getApplicationContext();
-
-        mediaPlayer = new MediaPlayer();
-        mediaPlayer.setOnBufferingUpdateListener(this);
-        mediaPlayer.setOnCompletionListener(this);
-        mediaPlayer.setOnPreparedListener(this);
-        mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
 
         // register remote event for notification
         IntentFilter intentFilter = new IntentFilter();
@@ -156,30 +143,34 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
         builder.setSmallIcon(applicationContest.getApplicationInfo().icon)
                 .setAutoCancel(false)
                 .setContent(notificationRemoteControl);
-
-        imageDownloadTask = new JustMusicPlayerImageDownloadTask(this);
-
     }
 
     // media player callbacks
     @Override
     public void onCompletion(MediaPlayer mp) {
 
+        if (mediaPlayer.isPlaying()) {
+            mediaPlayer.pause();
+        }
         stopTimer();
-        mediaPlayer.pause();
+        updateNotificationRemoteControl();
 
         // http://stackoverflow.com/questions/22607657/webview-methods-on-same-thread-error
         webView.getView().post(new Runnable() {
             @Override
             public void run() {
-                int currentTime = mediaPlayer.getCurrentPosition();
-                int duration = mediaPlayer.getDuration();
-                String jsCallback = JS_FUNCTION_NAMESPACE + ".didPlayerReachEnd(" + currentTime + ", " + duration + ");";
+                String jsCallback = JS_FUNCTION_NAMESPACE + ".didPlayerReachEnd();";
                 webView.loadUrl("javascript:" + jsCallback);
             }
         });
+    }
 
-        updateNotificationRemoteControl();
+    @Override
+    public void onPrepared(MediaPlayer mp) {
+        if (currentPlayerLoadCallbackContext != null) {
+            currentPlayerLoadCallbackContext.success();
+            currentPlayerLoadCallbackContext = null;
+        }
     }
 
     @Override
@@ -216,11 +207,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
         }
     }
 
-    @Override
-    public void onPrepared(MediaPlayer mp) {
-        currentPlayerLoadCallbackContext.success();
-        currentPlayerLoadCallbackContext = null;
-    }
+
 
     @Override
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext) throws JSONException {
@@ -264,7 +251,19 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
     private void load(String title, String artist, String albumTitle, String albumImagePath, String audioPath, CallbackContext callbackContext) {
 
         try {
-            mediaPlayer.reset();
+
+            if (mediaPlayer != null){
+                mediaPlayer.stop();
+                mediaPlayer.reset();
+                mediaPlayer.release();
+                mediaPlayer = null;
+            }
+
+            mediaPlayer = new MediaPlayer();
+            mediaPlayer.setOnBufferingUpdateListener(this);
+            mediaPlayer.setOnCompletionListener(this);
+            mediaPlayer.setOnPreparedListener(this);
+            mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
             mediaPlayer.setDataSource(audioPath);
             mediaPlayer.prepareAsync();
 
@@ -277,7 +276,9 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
             currentAlbumAudioInfo.audioPath = audioPath;
 
             // load album image async
+            JustMusicPlayerImageDownloadTask imageDownloadTask = new JustMusicPlayerImageDownloadTask(this);
             imageDownloadTask.execute(currentAlbumAudioInfo.albumImagePath);
+            updateNotificationRemoteControl();
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -285,7 +286,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
             currentPlayerLoadCallbackContext = null;
         }
 
-        updateNotificationRemoteControl();
+
     }
 
     /**
@@ -293,6 +294,9 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
      * @param callbackContext cordova bridge callback
      */
     private void play(CallbackContext callbackContext) {
+        if (mediaPlayer == null){
+            callbackContext.error("no source found");
+        }
         try {
 
             if (mediaPlayer.getCurrentPosition() >= mediaPlayer.getDuration()) {
@@ -312,6 +316,9 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
      * @param callbackContext cordova bridge callback
      */
     private void pause(CallbackContext callbackContext) {
+        if (mediaPlayer == null){
+            callbackContext.error("no source found");
+        }
         try {
             mediaPlayer.pause();
             stopTimer();
@@ -328,6 +335,9 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
      * @param callbackContext cordova bridge callback
      */
     private void seekTo(int time, CallbackContext callbackContext) {
+        if (mediaPlayer == null){
+            callbackContext.error("no source found");
+        }
         try {
             mediaPlayer.seekTo(time);
             callbackContext.success();
@@ -342,6 +352,9 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
      * @param callbackContext cordova bridge callback
      */
     private void setVolume(float volume, CallbackContext callbackContext) {
+        if (mediaPlayer == null){
+            callbackContext.error("no source found");
+        }
         try {
             mediaPlayer.setVolume(volume, volume);
             callbackContext.success();
@@ -383,9 +396,6 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
 
     public void updateNotificationRemoteControl() {
 
-        Boolean isPlaying = mediaPlayer.isPlaying();
-        // currentAlbumAudioInfo
-
         Resources applicationResources = applicationContest.getResources();
         String packageName = applicationContest.getPackageName();
 
@@ -401,7 +411,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
             notificationRemoteControl.setImageViewBitmap(imageAlbumArtId, currentAlbumAudioInfo.albumImage);
         }
 
-        if (isPlaying) {
+        if (mediaPlayer.isPlaying()) {
             notificationRemoteControl.setTextViewText(playPauseButtonId, "||");
         } else {
             notificationRemoteControl.setTextViewText(playPauseButtonId, ">");
@@ -457,6 +467,4 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
             justMusicPlayer.updateNotificationRemoteControl();
         }
     }
-
-
 }
