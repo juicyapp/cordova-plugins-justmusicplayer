@@ -10,8 +10,13 @@ import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaInterface;
 import org.apache.cordova.CordovaWebView;
 
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URLConnection;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.io.InputStream;
 
 import org.apache.cordova.LOG;
 import org.json.JSONArray;
@@ -31,11 +36,29 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.content.res.Resources;
 import android.widget.RemoteViews;
+import android.widget.Button;
+import android.widget.ImageView;
 
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.BroadcastReceiver;
+
+import android.os.AsyncTask;
+import android.net.Uri;
+import java.net.URL;
+
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+
+class AlbumAudioInfo {
+    public String title;
+    public String artist;
+    public String albumTitle;
+    public String albumImagePath;
+    public String audioPath;
+    public Bitmap albumImage;
+}
 
 /**
  * Android implementation of cordova JustMusicPlayer
@@ -57,6 +80,15 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
     private Timer timer;
     private TimerTask timerTask;
 
+    private Context applicationContest;
+
+    private Builder builder;
+    private RemoteViews notificationRemoteControl;
+
+    private AlbumAudioInfo currentAlbumAudioInfo = new AlbumAudioInfo();
+
+    private JustMusicPlayerImageDownloadTask imageDownloadTask;
+
     private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -68,7 +100,6 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
                 webView.loadUrl("javascript:" + jsCallback);
 
             } else if (action.equals(REMOTE_CONTROL_PLAY_PAUSE)) {
-
                 if(mediaPlayer.isPlaying()) {
                     mediaPlayer.pause();
                     stopTimer();
@@ -80,6 +111,8 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
                     startTimer();
                 }
 
+                updateNotificationRemoteControl();
+
             } else if (action.equals(REMOTE_CONTROL_NEXT)) {
 
                 String jsCallback = JS_FUNCTION_NAMESPACE + ".didRemotePreviousTrack();";
@@ -89,14 +122,19 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
         }
     };
 
-    // plugin initialize
+    /**
+     * right after plugin load, initialize everythings
+     * @param cordova CordovaInterface
+     * @param webView CordovaWebView
+     */
     @Override
     public void initialize(CordovaInterface cordova, CordovaWebView webView) {
         super.initialize(cordova, webView);
         // your init code here
-        Context applicationContest = cordova.getActivity().getApplicationContext();
 
         // init mediaPlayer
+        applicationContest = cordova.getActivity().getApplicationContext();
+
         mediaPlayer = new MediaPlayer();
         mediaPlayer.setOnBufferingUpdateListener(this);
         mediaPlayer.setOnCompletionListener(this);
@@ -110,12 +148,26 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
         intentFilter.addAction(REMOTE_CONTROL_PLAY_PAUSE);
         intentFilter.addAction(REMOTE_CONTROL_NEXT);
         applicationContest.registerReceiver(broadcastReceiver, intentFilter);
+
+        // notification builder
+        initNotificationRemoteControl();
+
+        builder = new Builder(applicationContest);
+        builder.setSmallIcon(applicationContest.getApplicationInfo().icon)
+                .setAutoCancel(false)
+                .setContent(notificationRemoteControl);
+
+        imageDownloadTask = new JustMusicPlayerImageDownloadTask(this);
+
     }
 
     // media player callbacks
     @Override
     public void onCompletion(MediaPlayer mp) {
+
         stopTimer();
+        mediaPlayer.pause();
+
         // http://stackoverflow.com/questions/22607657/webview-methods-on-same-thread-error
         webView.getView().post(new Runnable() {
             @Override
@@ -126,6 +178,8 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
                 webView.loadUrl("javascript:" + jsCallback);
             }
         });
+
+        updateNotificationRemoteControl();
     }
 
     @Override
@@ -135,7 +189,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
      * timer control
      */
     private void startTimer(){
-        
+
         timer = new Timer();
         timerTask = new TimerTask() {
             @Override
@@ -146,7 +200,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
                     public void run() {
                         int currentTime = mediaPlayer.getCurrentPosition();
                         int duration = mediaPlayer.getDuration();
-                        String jsCallback = JS_FUNCTION_NAMESPACE + ".didPlayerPlaying(" + currentTime + ", " + duration + ");";
+                        String jsCallback = JS_FUNCTION_NAMESPACE + ".didPlayerPlaying(" + currentTime + ", " + 0 + ");";
                         webView.loadUrl("javascript:" + jsCallback);
                     }
                 });
@@ -213,14 +267,25 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
             mediaPlayer.reset();
             mediaPlayer.setDataSource(audioPath);
             mediaPlayer.prepareAsync();
+
             currentPlayerLoadCallbackContext = callbackContext;
+
+            currentAlbumAudioInfo.title = title;
+            currentAlbumAudioInfo.artist = artist;
+            currentAlbumAudioInfo.albumTitle = albumTitle;
+            currentAlbumAudioInfo.albumImagePath = albumImagePath;
+            currentAlbumAudioInfo.audioPath = audioPath;
+
+            // load album image async
+            imageDownloadTask.execute(currentAlbumAudioInfo.albumImagePath);
+
         } catch (Exception e) {
             e.printStackTrace();
             callbackContext.error("");
             currentPlayerLoadCallbackContext = null;
         }
 
-        showRemoteControlNotifications();
+        updateNotificationRemoteControl();
     }
 
     /**
@@ -236,6 +301,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
             mediaPlayer.start();
             startTimer();
             callbackContext.success();
+            updateNotificationRemoteControl();
         } catch (Exception e) {
             callbackContext.error(e.getMessage());
         }
@@ -250,6 +316,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
             mediaPlayer.pause();
             stopTimer();
             callbackContext.success();
+            updateNotificationRemoteControl();
         } catch (Exception e) {
             callbackContext.error(e.getMessage());
         }
@@ -287,41 +354,64 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
         Music remote control
         notifications
      ----------------------*/
-    /**
-     * create custom notification
-     */
-    private void showRemoteControlNotifications() {
 
-        Context applicationContest = cordova.getActivity().getApplicationContext();
+    private void initNotificationRemoteControl() {
+
+        // http://stackoverflow.com/questions/19978849/phonegap-plugin-activity-import-layout
         Resources applicationResources = applicationContest.getResources();
         String packageName = applicationContest.getPackageName();
 
-        // remote control view
-        // http://stackoverflow.com/questions/19978849/phonegap-plugin-activity-import-layout
         int layoutIdentifier =  applicationResources.getIdentifier("notification_remote_control", "layout", packageName);
-        RemoteViews remoteViews = new RemoteViews(packageName, layoutIdentifier);
-
-        // notification builder
-        Builder builder = new Builder(applicationContest)
-                .setSmallIcon(applicationContest.getApplicationInfo().icon)
-                .setAutoCancel(true)
-                .setContent(remoteViews);
+        notificationRemoteControl = new RemoteViews(packageName, layoutIdentifier);
 
         // intent action for clicking previous
-        remoteViews.setOnClickPendingIntent(
+        notificationRemoteControl.setOnClickPendingIntent(
                 applicationResources.getIdentifier("remote_button_previous", "id", packageName),
                 createPendingIntentAction(applicationContest, REMOTE_CONTROL_PREVIOUS));
 
         // intent action for clicking next
-        remoteViews.setOnClickPendingIntent(
+        notificationRemoteControl.setOnClickPendingIntent(
                 applicationResources.getIdentifier("remote_button_next", "id", packageName),
                 createPendingIntentAction(applicationContest, REMOTE_CONTROL_NEXT));
 
         // intent action for clicking previous
-        remoteViews.setOnClickPendingIntent(
+        notificationRemoteControl.setOnClickPendingIntent(
                 applicationResources.getIdentifier("remote_button_play_pause", "id", packageName),
                 createPendingIntentAction(applicationContest, REMOTE_CONTROL_PLAY_PAUSE));
 
+    }
+
+    public void updateNotificationRemoteControl() {
+
+        Boolean isPlaying = mediaPlayer.isPlaying();
+        // currentAlbumAudioInfo
+
+        Resources applicationResources = applicationContest.getResources();
+        String packageName = applicationContest.getPackageName();
+
+        int playPauseButtonId = applicationResources.getIdentifier("remote_button_play_pause", "id", packageName);
+        int labelTitleId = applicationResources.getIdentifier("remote_label_title", "id", packageName);
+        int labelSubtitleId = applicationResources.getIdentifier("remote_label_subtitle", "id", packageName);
+        int imageAlbumArtId = applicationResources.getIdentifier("remote_album_art", "id", packageName);
+
+        notificationRemoteControl.setTextViewText(labelTitleId, currentAlbumAudioInfo.title);
+        notificationRemoteControl.setTextViewText(labelSubtitleId, currentAlbumAudioInfo.artist + " - " + currentAlbumAudioInfo.albumTitle);
+
+        if (currentAlbumAudioInfo.albumImage != null) {
+            notificationRemoteControl.setImageViewBitmap(imageAlbumArtId, currentAlbumAudioInfo.albumImage);
+        }
+
+        if (isPlaying) {
+            notificationRemoteControl.setTextViewText(playPauseButtonId, "||");
+        } else {
+            notificationRemoteControl.setTextViewText(playPauseButtonId, ">");
+        }
+
+        showRemoteControlNotifications();
+    }
+
+    private void showRemoteControlNotifications() {
+        // remote control view
         NotificationManager notificationManager = (NotificationManager)applicationContest.getSystemService(
                 android.content.Context.NOTIFICATION_SERVICE);
 
@@ -335,6 +425,37 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
     private PendingIntent createPendingIntentAction(Context applicationContest, String actionName) {
         Intent intent = new Intent(actionName);
         return PendingIntent.getBroadcast(applicationContest, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+
+
+    /*----------------------
+       Async image download for remote view
+     ----------------------*/
+    // http://stackoverflow.com/questions/2471935/how-to-load-an-imageview-by-url-in-android
+    private class JustMusicPlayerImageDownloadTask extends AsyncTask<String, Void, Bitmap> {
+        JustMusicPlayer justMusicPlayer;
+
+        public JustMusicPlayerImageDownloadTask(JustMusicPlayer justMusicPlayer) {
+            this.justMusicPlayer = justMusicPlayer;
+        }
+
+        protected Bitmap doInBackground(String... urls) {
+            String urldisplay = urls[0];
+            Bitmap mIcon11 = null;
+            try {
+                InputStream in = new URL(urldisplay).openStream();
+                mIcon11 = BitmapFactory.decodeStream(in);
+            } catch (Exception e) {
+                Log.e("Error", e.getMessage());
+                e.printStackTrace();
+            }
+            return mIcon11;
+        }
+
+        protected void onPostExecute(Bitmap result) {
+            justMusicPlayer.currentAlbumAudioInfo.albumImage = result;
+            justMusicPlayer.updateNotificationRemoteControl();
+        }
     }
 
 

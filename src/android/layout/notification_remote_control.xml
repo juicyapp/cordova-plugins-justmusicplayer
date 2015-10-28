@@ -13,7 +13,7 @@
         <ImageView
             android:layout_width="64dip"
             android:layout_height="64dip"
-            android:id="@+id/imageView"
+            android:id="@+id/remote_album_art"
             android:background="#0037ff" />
 
         <LinearLayout
@@ -32,7 +32,7 @@
                     android:layout_height="wrap_content"
                     android:textAppearance="?android:attr/textAppearanceLarge"
                     android:text="Large Text"
-                    android:id="@+id/textView"
+                    android:id="@+id/remote_label_title"
                     android:paddingTop="5dip"
                     android:paddingLeft="5dip" />
 
@@ -41,7 +41,7 @@
                     android:layout_height="wrap_content"
                     android:textAppearance="?android:attr/textAppearanceSmall"
                     android:text="Small Text"
-                    android:id="@+id/textView2"
+                    android:id="@+id/remote_label_subtitle"
                     android:paddingTop="5dip"
                     android:paddingLeft="5dip" />
 
@@ -61,21 +61,24 @@
                     android:layout_height="wrap_content"
                     android:text="&lt;&lt;"
                     android:id="@+id/remote_button_previous"
-                    android:layout_weight="0.33" />
+                    android:layout_weight="0.33"
+                    android:background="@null" />
 
                 <Button
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="||"
                     android:id="@+id/remote_button_play_pause"
-                    android:layout_weight="0.33" />
+                    android:layout_weight="0.33"
+                    android:background="@null" />
 
                 <Button
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text=">>"
                     android:id="@+id/remote_button_next"
-                    android:layout_weight="0.33" />
+                    android:layout_weight="0.33"
+                    android:background="@null" />
             </LinearLayout>
         </LinearLayout>
 
