@@ -14,7 +14,7 @@
             android:layout_width="64dip"
             android:layout_height="64dip"
             android:id="@+id/remote_album_art"
-            android:background="#0037ff" />
+            android:background="#00ffffff" />
 
         <LinearLayout
             android:orientation="horizontal"
