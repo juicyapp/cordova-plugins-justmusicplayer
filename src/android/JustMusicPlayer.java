@@ -433,14 +433,12 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
             this.justMusicPlayer = justMusicPlayer;
         }
 
-        protected Bitmap doInBackground(String... urls) {
-            String urldisplay = urls[0];
+        protected Bitmap doInBackground(String... params) {
             Bitmap mIcon11 = null;
             try {
-                InputStream in = new URL(urldisplay).openStream();
+                InputStream in = new URL(justMusicPlayer.currentAlbumAudioInfo.albumImagePath).openStream();
                 mIcon11 = BitmapFactory.decodeStream(in);
             } catch (Exception e) {
-                Log.e("Error", e.getMessage());
                 e.printStackTrace();
             }
             return mIcon11;
