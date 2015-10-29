@@ -176,8 +176,11 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
     [newInfo setObject:[NSNumber numberWithFloat:CMTimeGetSeconds([currentAudioItem currentTime])] forKey:MPNowPlayingInfoPropertyElapsedPlaybackTime];
     [newInfo setObject:[NSNumber numberWithInt:1] forKey:MPNowPlayingInfoPropertyPlaybackRate];
     
-    MPMediaItemArtwork *albumArt = [[MPMediaItemArtwork alloc] initWithImage:[UIImage imageWithData:[NSData dataWithContentsOfURL:[currentAlbumAudioInfo albumImageURL]]]];
-    [newInfo setObject:albumArt forKey:MPMediaItemPropertyArtwork];
+    if ([currentAlbumAudioInfo albumImage] != nil) {
+        MPMediaItemArtwork *albumArt = [[MPMediaItemArtwork alloc] initWithImage:[currentAlbumAudioInfo albumImage]];
+        [newInfo setObject:albumArt forKey:MPMediaItemPropertyArtwork];
+    }
+
     [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:newInfo];
 }
 
@@ -210,9 +213,18 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
     AVPlayerItem *currentAudioItem = avPlayer.currentItem;
     
     [self stopTimer];
-    NSString* jsString = [NSString stringWithFormat:@"%@.didPlayerReachEnd();", JS_FUNCTION_NAMESPACE];
+    NSString* jsString = [NSString stringWithFormat:@"%@.didPlayerPlaying(%f, %f);", JS_FUNCTION_NAMESPACE, CMTimeGetSeconds([currentAudioItem currentTime]), CMTimeGetSeconds([currentAudioItem duration])];
     [self.webView stringByEvaluatingJavaScriptFromString:jsString];
     [self updateMPInfo];
+}
+
+- (void) asyncLoadCurrentAlbumAudioInfoImage {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        [currentAlbumAudioInfo setAlbumImage:[UIImage imageWithData:[NSData dataWithContentsOfURL:[currentAlbumAudioInfo albumImageURL]]]];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self updateMPInfo];
+        });
+    });
 }
 
 
@@ -225,6 +237,7 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
     [currentAlbumAudioInfo setAlbumTitle:[command argumentAtIndex:2]];
     [currentAlbumAudioInfo setAlbumImageURL:[NSURL URLWithString:[command argumentAtIndex:3]]];
     [currentAlbumAudioInfo setAudioURL:[NSURL URLWithString:[command argumentAtIndex:4]]];
+    [self asyncLoadCurrentAlbumAudioInfoImage];
     
     // in case is playing
     [self stopTimer];
