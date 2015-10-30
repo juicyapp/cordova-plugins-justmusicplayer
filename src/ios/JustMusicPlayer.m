@@ -1,6 +1,8 @@
 /********* JustMusicPlayer.m Cordova Plugin Implementation *******/
 //http://stackoverflow.com/questions/13131177/streaming-mp3-audio-with-avplayer
 
+#include <objc/runtime.h>
+
 #import <Cordova/CDV.h>
 #import <MediaPlayer/MediaPlayer.h>
 #import <MediaPlayer/MPNowPlayingInfoCenter.h>
