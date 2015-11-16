@@ -191,7 +191,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
                     public void run() {
                         int currentTime = mediaPlayer.getCurrentPosition();
                         int duration = mediaPlayer.getDuration();
-                        String jsCallback = JS_FUNCTION_NAMESPACE + ".didPlayerPlaying(" + currentTime + ", " + 0 + ");";
+                        String jsCallback = JS_FUNCTION_NAMESPACE + ".didPlayerPlaying(" + currentTime + ", " + duration + ");";
                         webView.loadUrl("javascript:" + jsCallback);
                     }
                 });
