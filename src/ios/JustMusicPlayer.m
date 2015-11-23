@@ -50,12 +50,17 @@ audioURL;
 @property (strong, nonatomic) AlbumAudioInfo *currentAlbumAudioInfo;
 @property (retain, nonatomic) NSTimer *timer;
 @property (retain, nonatomic) NSString *currentPlayerLoadCommandId;
+@property (nonatomic) BOOL isShowRemote;
 
 - (void)load:(CDVInvokedUrlCommand*)command;
 - (void)play:(CDVInvokedUrlCommand*)command ;
 - (void)pause:(CDVInvokedUrlCommand*)command;
+- (void)end:(CDVInvokedUrlCommand*)command;
 - (void)seekTo:(CDVInvokedUrlCommand*)command;
 - (void)setVolume:(CDVInvokedUrlCommand*)command;
+- (void)getDuration:(CDVInvokedUrlCommand*)command;
+- (void)getPosition:(CDVInvokedUrlCommand*)command;
+- (void)setShowRemote:(CDVInvokedUrlCommand*)command;
 
 @end
 
@@ -81,6 +86,7 @@ audioURL;
     
     // init properties
     currentAlbumAudioInfo = [[AlbumAudioInfo alloc] init];
+    [self setIsShowRemote:YES];
 }
 
 // override main view controller
@@ -167,23 +173,32 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
 
 
 - (void) updateMPInfo {
-    AVPlayerItem *currentAudioItem = avPlayer.currentItem;
     
-    NSMutableDictionary* newInfo = [NSMutableDictionary dictionary];
-    [newInfo setObject:[currentAlbumAudioInfo title] forKey:MPMediaItemPropertyTitle];
-    [newInfo setObject:[currentAlbumAudioInfo artist] forKey:MPMediaItemPropertyArtist];
-    [newInfo setObject:[currentAlbumAudioInfo albumTitle] forKey:MPMediaItemPropertyAlbumTitle];
-    
-    [newInfo setObject:[NSNumber numberWithFloat:CMTimeGetSeconds([currentAudioItem duration])] forKey:MPMediaItemPropertyPlaybackDuration];
-    [newInfo setObject:[NSNumber numberWithFloat:CMTimeGetSeconds([currentAudioItem currentTime])] forKey:MPNowPlayingInfoPropertyElapsedPlaybackTime];
-    [newInfo setObject:[NSNumber numberWithInt:1] forKey:MPNowPlayingInfoPropertyPlaybackRate];
-    
-    if ([currentAlbumAudioInfo albumImage] != nil) {
-        MPMediaItemArtwork *albumArt = [[MPMediaItemArtwork alloc] initWithImage:[currentAlbumAudioInfo albumImage]];
-        [newInfo setObject:albumArt forKey:MPMediaItemPropertyArtwork];
+    if (![self isShowRemote]) {
+        
+        [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:nil];
+        
+    } else {
+        
+        AVPlayerItem *currentAudioItem = avPlayer.currentItem;
+        
+        NSMutableDictionary* newInfo = [NSMutableDictionary dictionary];
+        [newInfo setObject:[currentAlbumAudioInfo title] forKey:MPMediaItemPropertyTitle];
+        [newInfo setObject:[currentAlbumAudioInfo artist] forKey:MPMediaItemPropertyArtist];
+        [newInfo setObject:[currentAlbumAudioInfo albumTitle] forKey:MPMediaItemPropertyAlbumTitle];
+        
+        [newInfo setObject:[NSNumber numberWithFloat:CMTimeGetSeconds([currentAudioItem duration])] forKey:MPMediaItemPropertyPlaybackDuration];
+        [newInfo setObject:[NSNumber numberWithFloat:CMTimeGetSeconds([currentAudioItem currentTime])] forKey:MPNowPlayingInfoPropertyElapsedPlaybackTime];
+        [newInfo setObject:[NSNumber numberWithInt:1] forKey:MPNowPlayingInfoPropertyPlaybackRate];
+        
+        if ([currentAlbumAudioInfo albumImage] != nil) {
+            MPMediaItemArtwork *albumArt = [[MPMediaItemArtwork alloc] initWithImage:[currentAlbumAudioInfo albumImage]];
+            [newInfo setObject:albumArt forKey:MPMediaItemPropertyArtwork];
+        }
+        
+        [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:newInfo];
     }
 
-    [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:newInfo];
 }
 
 // player time events
@@ -206,7 +221,7 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
 - (void) timerTick {
     AVPlayerItem *currentAudioItem = avPlayer.currentItem;
     
-    NSString* jsString = [NSString stringWithFormat:@"%@.didPlayerPlaying(%f, %f);", JS_FUNCTION_NAMESPACE, CMTimeGetSeconds([currentAudioItem currentTime]), CMTimeGetSeconds([currentAudioItem duration])];
+    NSString* jsString = [NSString stringWithFormat:@"%@.didPlayerPlaying(%f, %f);", JS_FUNCTION_NAMESPACE, CMTimeGetSeconds([currentAudioItem currentTime])*1000, CMTimeGetSeconds([currentAudioItem duration])];
     [self.webView stringByEvaluatingJavaScriptFromString:jsString];
     [self updateMPInfo];
 }
@@ -215,7 +230,7 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
     AVPlayerItem *currentAudioItem = avPlayer.currentItem;
     
     [self stopTimer];
-    NSString* jsString = [NSString stringWithFormat:@"%@.didPlayerPlaying(%f, %f);", JS_FUNCTION_NAMESPACE, CMTimeGetSeconds([currentAudioItem currentTime]), CMTimeGetSeconds([currentAudioItem duration])];
+    NSString* jsString = [NSString stringWithFormat:@"%@.didPlayerPlaying(%f, %f);", JS_FUNCTION_NAMESPACE, CMTimeGetSeconds([currentAudioItem currentTime])*1000, CMTimeGetSeconds([currentAudioItem duration])];
     [self.webView stringByEvaluatingJavaScriptFromString:jsString];
     [self updateMPInfo];
 }
@@ -310,6 +325,23 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
     return [self callback:CDVCommandStatus_OK id:command.callbackId withMessage:@""];
 }
 
+- (void)end:(CDVInvokedUrlCommand*)command {
+    NSLog(@"end");
+    
+    // remove avPlayer and event listener
+    if (avPlayer != nil) {
+        [avPlayer pause];
+        [avPlayer removeObserver:self forKeyPath:@"status"];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(playerItemDidReachEnd)
+                                                     name:AVPlayerItemDidPlayToEndTimeNotification
+                                                   object:[avPlayer currentItem]];
+        currentPlayerLoadCommandId = nil;
+    }
+    return [self callback:CDVCommandStatus_OK id:command.callbackId withMessage:@""];
+    
+}
+
 - (void) seekTo:(CDVInvokedUrlCommand*)command {
     NSLog(@"seekTo");
     
@@ -336,6 +368,49 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
     [self callback:CDVCommandStatus_OK id:command.callbackId withMessage:@""];
 }
 
+- (void)getPosition:(CDVInvokedUrlCommand*)command {
+    NSLog(@"setVolume");
+    
+    if (avPlayer == nil) {
+        [self noSourceCallback:command.callbackId];
+        return;
+    }
+    
+    AVPlayerItem *currentAudioItem = avPlayer.currentItem;
+    [self.commandDelegate sendPluginResult:[CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                                messageAsInt:CMTimeGetSeconds(currentAudioItem.currentTime)*1000]
+                                callbackId:command.callbackId];
+}
+
+- (void)getDuration:(CDVInvokedUrlCommand*)command {
+    NSLog(@"getDuration");
+    
+    if (avPlayer == nil) {
+        [self noSourceCallback:command.callbackId];
+        return;
+    }
+    
+    AVPlayerItem *currentAudioItem = avPlayer.currentItem;
+    [self.commandDelegate sendPluginResult:[CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                                messageAsInt:CMTimeGetSeconds(currentAudioItem.duration)*1000]
+                                callbackId:command.callbackId];
+}
+
+- (void)setShowRemote:(CDVInvokedUrlCommand*)command {
+    NSLog(@"setShowRemote");
+    
+    if (avPlayer == nil) {
+        [self noSourceCallback:command.callbackId];
+        return;
+    }
+    
+    BOOL isShow = [command argumentAtIndex:0];
+    if (isShow != [self isShowRemote]){
+        [self updateMPInfo];
+    }
+    [self setIsShowRemote:isShow];
+    [self callback:CDVCommandStatus_OK id:command.callbackId withMessage:@""];
+}
+
 
 @end
-
