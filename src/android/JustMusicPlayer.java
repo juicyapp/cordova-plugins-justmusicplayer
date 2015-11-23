@@ -80,8 +80,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
     private Builder builder;
     private RemoteViews notificationRemoteControl;
     private AlbumAudioInfo currentAlbumAudioInfo = new AlbumAudioInfo();
-
-
+    private Boolean isShowRemote = true;
 
 
     private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
@@ -233,8 +232,17 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
         if (action.equals("end")) {
             this.end(callbackContext);
         }
+        if (action.equals("getDuration")) {
+            this.getDuration(callbackContext);
+        }
+        if (action.equals("getPosition")) {
+            this.getPosition(callbackContext);
+        }
         if (action.equals("seekTo")) {
             this.seekTo(args.getInt(0), callbackContext);
+        }
+        if (action.equals("setShowRemote")) {
+            this.setShowRemote(args.getBoolean(0), callbackContext);
         }
         if (action.equals("setVolume")) {
             this.setVolume((float)args.getDouble(0), callbackContext);
@@ -294,6 +302,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
     private void clearMediaPlayer() {
         stopTimer();
         if (mediaPlayer != null){
+            Log.i("a", "release mediaPlayer");
             mediaPlayer.stop();
             mediaPlayer.setOnBufferingUpdateListener(null);
             mediaPlayer.setOnCompletionListener(null);
@@ -315,6 +324,32 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
             mediaPlayer.start();
             startTimer();
             callbackContext.success();
+            updateNotificationRemoteControl();
+        } catch (Exception e) {
+            callbackContext.error(e.getMessage());
+        }
+    }
+
+    /**
+     * player current position
+     * @param callbackContext
+     */
+    private void getPosition(CallbackContext callbackContext) {
+        try {
+            callbackContext.success(mediaPlayer.getCurrentPosition());
+            updateNotificationRemoteControl();
+        } catch (Exception e) {
+            callbackContext.error(e.getMessage());
+        }
+    }
+
+    /**
+     * music duration
+     * @param callbackContext
+     */
+    private void getDuration(CallbackContext callbackContext) {
+        try {
+            callbackContext.success(mediaPlayer.getDuration());
             updateNotificationRemoteControl();
         } catch (Exception e) {
             callbackContext.error(e.getMessage());
@@ -378,6 +413,23 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
         }
     }
 
+    /**
+     * set Hide/Show remote control
+     * @param isShow
+     * @param callbackContext
+     */
+    private void setShowRemote(Boolean isShow, CallbackContext callbackContext){
+        try {
+            if (isShowRemote != isShow) {
+                reloadNotificationRemoteControl();
+            }
+            isShowRemote = isShow;
+            callbackContext.success();
+        } catch (Exception e) {
+            callbackContext.error(e.getMessage());
+        }
+    }
+
     /*----------------------
         Music remote control
         notifications
@@ -390,7 +442,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
 
         releaseNotificationRemoteControl();
 
-        if (mediaPlayer == null) {
+        if (mediaPlayer == null || !isShowRemote) {
             return;
         }
 
@@ -419,6 +471,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
 
         notificationRemoteControl.setTextViewText(labelTitleId, currentAlbumAudioInfo.title);
         notificationRemoteControl.setTextViewText(labelSubtitleId, currentAlbumAudioInfo.artist + " - " + currentAlbumAudioInfo.albumTitle);
+        notificationRemoteControl.setTextViewText(playPauseButtonId, "||");
 
         if (currentAlbumAudioInfo.albumImage != null) {
             notificationRemoteControl.setImageViewBitmap(imageAlbumArtId, currentAlbumAudioInfo.albumImage);
@@ -480,12 +533,16 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
             notificationRemoteControl.removeAllViews(layoutIdentifier);
         }
     }
-    
+
+    /**
+     * @param applicationContest
+     * @param actionName
+     * @return
+     */
     private PendingIntent createPendingIntentAction(Context applicationContest, String actionName) {
         Intent intent = new Intent(actionName);
         return PendingIntent.getBroadcast(applicationContest, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
     }
-
 
     /*----------------------
        Async image download for remote view
