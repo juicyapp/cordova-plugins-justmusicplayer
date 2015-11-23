@@ -67,16 +67,22 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
 
     public static final int REMOTE_CONTROL_NOTIFICATION_ID = 1000;
 
+    private Context applicationContest;
+    private Resources applicationResources;
+    private String packageName;
+
     private MediaPlayer mediaPlayer;
     private CallbackContext currentPlayerLoadCallbackContext;
 
     private Timer timer;
     private TimerTask timerTask;
-    private Context applicationContest;
 
     private Builder builder;
     private RemoteViews notificationRemoteControl;
     private AlbumAudioInfo currentAlbumAudioInfo = new AlbumAudioInfo();
+
+
+
 
     private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
         @Override
@@ -126,7 +132,10 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
         super.initialize(cordova, webView);
         // your init code here
 
+        // http://stackoverflow.com/questions/19978849/phonegap-plugin-activity-import-layout
         applicationContest = cordova.getActivity().getApplicationContext();
+        applicationResources = applicationContest.getResources();
+        packageName = applicationContest.getPackageName();
 
         // register remote event for notification
         IntentFilter intentFilter = new IntentFilter();
@@ -137,12 +146,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
         applicationContest.registerReceiver(broadcastReceiver, intentFilter);
 
         // notification builder
-        initNotificationRemoteControl();
-
         builder = new Builder(applicationContest);
-        builder.setSmallIcon(applicationContest.getApplicationInfo().icon)
-                .setAutoCancel(false)
-                .setContent(notificationRemoteControl);
     }
 
     // media player callbacks
@@ -226,6 +230,9 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
         if (action.equals("pause")) {
             this.pause(callbackContext);
         }
+        if (action.equals("end")) {
+            this.end(callbackContext);
+        }
         if (action.equals("seekTo")) {
             this.seekTo(args.getInt(0), callbackContext);
         }
@@ -250,12 +257,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
 
         try {
 
-            if (mediaPlayer != null){
-                mediaPlayer.stop();
-                mediaPlayer.reset();
-                mediaPlayer.release();
-                mediaPlayer = null;
-            }
+            clearMediaPlayer();
 
             mediaPlayer = new MediaPlayer();
             mediaPlayer.setOnBufferingUpdateListener(this);
@@ -276,7 +278,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
             // load album image async
             JustMusicPlayerImageDownloadTask imageDownloadTask = new JustMusicPlayerImageDownloadTask(this);
             imageDownloadTask.execute(currentAlbumAudioInfo.albumImagePath);
-            updateNotificationRemoteControl();
+            reloadNotificationRemoteControl();
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -284,6 +286,21 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
             currentPlayerLoadCallbackContext = null;
         }
 
+    }
+
+    /**
+     * stop and release
+     */
+    private void clearMediaPlayer() {
+        stopTimer();
+        if (mediaPlayer != null){
+            mediaPlayer.stop();
+            mediaPlayer.setOnBufferingUpdateListener(null);
+            mediaPlayer.setOnCompletionListener(null);
+            mediaPlayer.setOnPreparedListener(null);
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
     }
 
     /**
@@ -314,6 +331,20 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
             stopTimer();
             callbackContext.success();
             updateNotificationRemoteControl();
+        } catch (Exception e) {
+            callbackContext.error(e.getMessage());
+        }
+    }
+
+    /**
+     * end, release everythings
+     * @param callbackContext
+     */
+    private void end(CallbackContext callbackContext) {
+        try {
+            clearMediaPlayer();
+            callbackContext.success();
+            reloadNotificationRemoteControl();
         } catch (Exception e) {
             callbackContext.error(e.getMessage());
         }
@@ -352,11 +383,16 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
         notifications
      ----------------------*/
 
-    private void initNotificationRemoteControl() {
+    /**
+     * do it when new music is loaded
+     */
+    private void reloadNotificationRemoteControl() {
 
-        // http://stackoverflow.com/questions/19978849/phonegap-plugin-activity-import-layout
-        Resources applicationResources = applicationContest.getResources();
-        String packageName = applicationContest.getPackageName();
+        releaseNotificationRemoteControl();
+
+        if (mediaPlayer == null) {
+            return;
+        }
 
         int layoutIdentifier =  applicationResources.getIdentifier("notification_remote_control", "layout", packageName);
         notificationRemoteControl = new RemoteViews(packageName, layoutIdentifier);
@@ -376,13 +412,6 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
                 applicationResources.getIdentifier("remote_button_play_pause", "id", packageName),
                 createPendingIntentAction(applicationContest, REMOTE_CONTROL_PLAY_PAUSE));
 
-    }
-
-    public void updateNotificationRemoteControl() {
-
-        Resources applicationResources = applicationContest.getResources();
-        String packageName = applicationContest.getPackageName();
-
         int playPauseButtonId = applicationResources.getIdentifier("remote_button_play_pause", "id", packageName);
         int labelTitleId = applicationResources.getIdentifier("remote_label_title", "id", packageName);
         int labelSubtitleId = applicationResources.getIdentifier("remote_label_subtitle", "id", packageName);
@@ -395,16 +424,38 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
             notificationRemoteControl.setImageViewBitmap(imageAlbumArtId, currentAlbumAudioInfo.albumImage);
         }
 
+        builder.setSmallIcon(applicationContest.getApplicationInfo().icon)
+                .setAutoCancel(true)
+                .setContent(notificationRemoteControl);
+
+        displayNotificationRemoteControl();
+    }
+
+    /**
+     * update player controls only
+     */
+    public void updateNotificationRemoteControl() {
+
+        if (mediaPlayer == null || notificationRemoteControl == null) {
+            return;
+        }
+
+        // http://stackoverflow.com/questions/19978849/phonegap-plugin-activity-import-layout
+        Resources applicationResources = applicationContest.getResources();
+        String packageName = applicationContest.getPackageName();
+
+        int playPauseButtonId = applicationResources.getIdentifier("remote_button_play_pause", "id", packageName);
+
         if (mediaPlayer.isPlaying()) {
             notificationRemoteControl.setTextViewText(playPauseButtonId, "||");
         } else {
             notificationRemoteControl.setTextViewText(playPauseButtonId, ">");
         }
 
-        showRemoteControlNotifications();
+        displayNotificationRemoteControl();
     }
 
-    private void showRemoteControlNotifications() {
+    public void displayNotificationRemoteControl() {
         // remote control view
         NotificationManager notificationManager = (NotificationManager)applicationContest.getSystemService(
                 android.content.Context.NOTIFICATION_SERVICE);
@@ -416,6 +467,20 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
         notificationManager.notify(REMOTE_CONTROL_NOTIFICATION_ID, notification);
     }
 
+    public void releaseNotificationRemoteControl() {
+
+        int layoutIdentifier =  applicationResources.getIdentifier("notification_remote_control", "layout", packageName);
+
+        if (notificationRemoteControl != null) {
+            // remote control view
+            NotificationManager notificationManager = (NotificationManager)applicationContest.getSystemService(
+                    android.content.Context.NOTIFICATION_SERVICE);
+            notificationManager.cancel(REMOTE_CONTROL_NOTIFICATION_ID);
+
+            notificationRemoteControl.removeAllViews(layoutIdentifier);
+        }
+    }
+    
     private PendingIntent createPendingIntentAction(Context applicationContest, String actionName) {
         Intent intent = new Intent(actionName);
         return PendingIntent.getBroadcast(applicationContest, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
@@ -446,7 +511,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
 
         protected void onPostExecute(Bitmap result) {
             justMusicPlayer.currentAlbumAudioInfo.albumImage = result;
-            justMusicPlayer.updateNotificationRemoteControl();
+            justMusicPlayer.reloadNotificationRemoteControl();
         }
     }
 }
