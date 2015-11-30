@@ -351,7 +351,7 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
     }
     
     NSNumber *time = [command argumentAtIndex:0];
-    [avPlayer seekToTime:CMTimeMakeWithSeconds([time intValue], 1)];
+    [avPlayer seekToTime:CMTimeMakeWithSeconds([time intValue]/1000, 1)];
     [self callback:CDVCommandStatus_OK id:command.callbackId withMessage:@""];
 }
 
