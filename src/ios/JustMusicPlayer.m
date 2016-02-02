@@ -160,11 +160,11 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
             break;
         case UIEventSubtypeRemoteControlNextTrack:
             jsString = [NSString stringWithFormat:@"%@.didRemoteNextTrack();", JS_FUNCTION_NAMESPACE];
-            [self.webView stringByEvaluatingJavaScriptFromString:jsString];
+            [[self webViewEngine] evaluateJavaScript:jsString completionHandler:nil];
             break;
         case UIEventSubtypeRemoteControlPreviousTrack:
             jsString = [NSString stringWithFormat:@"%@.didRemotePreviousTrack();", JS_FUNCTION_NAMESPACE];
-            [self.webView stringByEvaluatingJavaScriptFromString:jsString];
+            [[self webViewEngine] evaluateJavaScript:jsString completionHandler:nil];
         break;
         default:
         break;
@@ -222,7 +222,7 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
     AVPlayerItem *currentAudioItem = avPlayer.currentItem;
     
     NSString* jsString = [NSString stringWithFormat:@"%@.didPlayerPlaying(%f, %f);", JS_FUNCTION_NAMESPACE, CMTimeGetSeconds([currentAudioItem currentTime])*1000, CMTimeGetSeconds([currentAudioItem duration])*1000];
-    [self.webView stringByEvaluatingJavaScriptFromString:jsString];
+    [[self webViewEngine] evaluateJavaScript:jsString completionHandler:nil];
     [self updateMPInfo];
 }
 
@@ -231,7 +231,7 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
     
     [self stopTimer];
     NSString* jsString = [NSString stringWithFormat:@"%@.didPlayerPlaying(%f, %f);", JS_FUNCTION_NAMESPACE, CMTimeGetSeconds([currentAudioItem currentTime])*1000, CMTimeGetSeconds([currentAudioItem duration])*1000];
-    [self.webView stringByEvaluatingJavaScriptFromString:jsString];
+    [[self webViewEngine] evaluateJavaScript:jsString completionHandler:nil];
     [self updateMPInfo];
 }
 
