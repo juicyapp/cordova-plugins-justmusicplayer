@@ -160,11 +160,11 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
             break;
         case UIEventSubtypeRemoteControlNextTrack:
             jsString = [NSString stringWithFormat:@"%@.didRemoteNextTrack();", JS_FUNCTION_NAMESPACE];
-            [[self webViewEngine] evaluateJavaScript:jsString completionHandler:nil];
+            [self.webView stringByEvaluatingJavaScriptFromString:jsString];
             break;
         case UIEventSubtypeRemoteControlPreviousTrack:
             jsString = [NSString stringWithFormat:@"%@.didRemotePreviousTrack();", JS_FUNCTION_NAMESPACE];
-            [[self webViewEngine] evaluateJavaScript:jsString completionHandler:nil];
+            [self.webView stringByEvaluatingJavaScriptFromString:jsString];
         break;
         default:
         break;
@@ -222,7 +222,7 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
     AVPlayerItem *currentAudioItem = avPlayer.currentItem;
     
     NSString* jsString = [NSString stringWithFormat:@"%@.didPlayerPlaying(%f, %f);", JS_FUNCTION_NAMESPACE, CMTimeGetSeconds([currentAudioItem currentTime])*1000, CMTimeGetSeconds([currentAudioItem duration])*1000];
-    [[self webViewEngine] evaluateJavaScript:jsString completionHandler:nil];
+    [self.webView stringByEvaluatingJavaScriptFromString:jsString];
     [self updateMPInfo];
 }
 
@@ -231,7 +231,10 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
     
     [self stopTimer];
     NSString* jsString = [NSString stringWithFormat:@"%@.didPlayerPlaying(%f, %f);", JS_FUNCTION_NAMESPACE, CMTimeGetSeconds([currentAudioItem currentTime])*1000, CMTimeGetSeconds([currentAudioItem duration])*1000];
-    [[self webViewEngine] evaluateJavaScript:jsString completionHandler:nil];
+    [self.webView stringByEvaluatingJavaScriptFromString:jsString];
+    jsString = [NSString stringWithFormat:@"%@.didRemotePreviousTrack();", JS_FUNCTION_NAMESPACE];
+    [self.webView stringByEvaluatingJavaScriptFromString:jsString];
+    
     [self updateMPInfo];
 }
 
@@ -263,10 +266,6 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
     if (avPlayer != nil) {
         [avPlayer pause];
         [avPlayer removeObserver:self forKeyPath:@"status"];
-        [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(playerItemDidReachEnd)
-                                                     name:AVPlayerItemDidPlayToEndTimeNotification
-                                                   object:[avPlayer currentItem]];
         currentPlayerLoadCommandId = nil;
     }
 
