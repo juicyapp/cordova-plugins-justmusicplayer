@@ -2,7 +2,8 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical" android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:baselineAligned="true">
+    android:baselineAligned="true"
+    android:background="#ff333333">
 
     <LinearLayout
         android:orientation="horizontal"
@@ -14,7 +15,7 @@
             android:layout_width="64dip"
             android:layout_height="64dip"
             android:id="@+id/remote_album_art"
-            android:background="#00ffffff" />
+            android:background="#ffffffff" />
 
         <LinearLayout
             android:orientation="horizontal"
@@ -33,6 +34,7 @@
                     android:textAppearance="?android:attr/textAppearanceLarge"
                     android:text="Large Text"
                     android:id="@+id/remote_label_title"
+                    android:textColor="#ffffffff"
                     android:paddingTop="5dip"
                     android:paddingLeft="5dip" />
 
@@ -42,6 +44,7 @@
                     android:textAppearance="?android:attr/textAppearanceSmall"
                     android:text="Small Text"
                     android:id="@+id/remote_label_subtitle"
+                    android:textColor="#ffffffff"
                     android:paddingTop="5dip"
                     android:paddingLeft="5dip" />
 
@@ -62,6 +65,7 @@
                     android:text="&lt;&lt;"
                     android:id="@+id/remote_button_previous"
                     android:layout_weight="0.33"
+                    android:textColor="#ffffffff"
                     android:background="@null" />
 
                 <Button
@@ -70,6 +74,7 @@
                     android:text="||"
                     android:id="@+id/remote_button_play_pause"
                     android:layout_weight="0.33"
+                    android:textColor="#ffffffff"
                     android:background="@null" />
 
                 <Button
@@ -78,6 +83,7 @@
                     android:text=">>"
                     android:id="@+id/remote_button_next"
                     android:layout_weight="0.33"
+                    android:textColor="#ffffffff"
                     android:background="@null" />
             </LinearLayout>
         </LinearLayout>
