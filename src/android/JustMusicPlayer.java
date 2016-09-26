@@ -90,7 +90,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
 
             if (action.equals(REMOTE_CONTROL_PREVIOUS)) {
 
-                String jsCallback = JS_FUNCTION_NAMESPACE + ".didRemoteNextTrack();";
+                String jsCallback = JS_FUNCTION_NAMESPACE + ".didRemotePreviousTrack();";
                 webView.loadUrl("javascript:" + jsCallback);
 
             } else if (action.equals(REMOTE_CONTROL_PLAY_PAUSE)) {
@@ -114,7 +114,7 @@ public class JustMusicPlayer extends CordovaPlugin implements OnBufferingUpdateL
 
             } else if (action.equals(REMOTE_CONTROL_NEXT)) {
 
-                String jsCallback = JS_FUNCTION_NAMESPACE + ".didRemotePreviousTrack();";
+                String jsCallback = JS_FUNCTION_NAMESPACE + ".didRemoteNextTrack();";
                 webView.loadUrl("javascript:" + jsCallback);
 
             }
