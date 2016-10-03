@@ -232,7 +232,7 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
     [self stopTimer];
     NSString* jsString = [NSString stringWithFormat:@"%@.didPlayerPlaying(%f, %f);", JS_FUNCTION_NAMESPACE, CMTimeGetSeconds([currentAudioItem currentTime])*1000, CMTimeGetSeconds([currentAudioItem duration])*1000];
     [self.webView stringByEvaluatingJavaScriptFromString:jsString];
-    jsString = [NSString stringWithFormat:@"%@.didRemotePreviousTrack();", JS_FUNCTION_NAMESPACE];
+    jsString = [NSString stringWithFormat:@"%@.didPlayerReachEnd();", JS_FUNCTION_NAMESPACE];
     [self.webView stringByEvaluatingJavaScriptFromString:jsString];
     
     [self updateMPInfo];
