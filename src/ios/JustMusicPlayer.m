@@ -233,7 +233,7 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
     NSString* jsString = [NSString stringWithFormat:@"%@.didPlayerPlaying(%f, %f);", JS_FUNCTION_NAMESPACE, CMTimeGetSeconds([currentAudioItem currentTime])*1000, CMTimeGetSeconds([currentAudioItem duration])*1000];
      [(UIWebView*)self.webView stringByEvaluatingJavaScriptFromString:jsString];
     jsString = [NSString stringWithFormat:@"%@.didPlayerReachEnd();", JS_FUNCTION_NAMESPACE];
-    [self.webView stringByEvaluatingJavaScriptFromString:jsString];
+    [(UIWebView*)self.webView stringByEvaluatingJavaScriptFromString:jsString];
     
     [self updateMPInfo];
 }
@@ -271,7 +271,9 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
 
     // create audio
     avPlayer = [AVPlayer playerWithPlayerItem:[AVPlayerItem playerItemWithURL:[currentAlbumAudioInfo audioURL]]];
-    avPlayer.automaticallyWaitsToMinimizeStalling = NO;
+    if (NSFoundationVersionNumber > NSFoundationVersionNumber_iOS_9_x_Max) {
+        avPlayer.automaticallyWaitsToMinimizeStalling = NO;
+    }
     
     // add listener
     [avPlayer addObserver:self forKeyPath:@"status" options:0 context:nil];
