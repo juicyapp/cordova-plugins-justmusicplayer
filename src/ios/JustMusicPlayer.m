@@ -160,11 +160,11 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
             break;
         case UIEventSubtypeRemoteControlNextTrack:
             jsString = [NSString stringWithFormat:@"%@.didRemoteNextTrack();", JS_FUNCTION_NAMESPACE];
-            [(UIWebView*)self.webView stringByEvaluatingJavaScriptFromString:jsString];
+            [self.webViewEngine evaluateJavaScript:jsString completionHandler:^(id event, NSError *err) {}];
             break;
         case UIEventSubtypeRemoteControlPreviousTrack:
             jsString = [NSString stringWithFormat:@"%@.didRemotePreviousTrack();", JS_FUNCTION_NAMESPACE];
-            [(UIWebView*)self.webView stringByEvaluatingJavaScriptFromString:jsString];
+            [self.webViewEngine evaluateJavaScript:jsString completionHandler:^(id event, NSError *err) {}];
         break;
         default:
         break;
@@ -222,7 +222,7 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
     AVPlayerItem *currentAudioItem = avPlayer.currentItem;
     
     NSString* jsString = [NSString stringWithFormat:@"%@.didPlayerPlaying(%f, %f);", JS_FUNCTION_NAMESPACE, CMTimeGetSeconds([currentAudioItem currentTime])*1000, CMTimeGetSeconds([currentAudioItem duration])*1000];
-     [(UIWebView*)self.webView stringByEvaluatingJavaScriptFromString:jsString];
+    [self.webViewEngine evaluateJavaScript:jsString completionHandler:^(id event, NSError *err) {}];
     [self updateMPInfo];
 }
 
@@ -231,9 +231,9 @@ void remoteControlReceivedWithEventImp(id self, SEL _cmd, UIEvent * event) {
     
     [self stopTimer];
     NSString* jsString = [NSString stringWithFormat:@"%@.didPlayerPlaying(%f, %f);", JS_FUNCTION_NAMESPACE, CMTimeGetSeconds([currentAudioItem currentTime])*1000, CMTimeGetSeconds([currentAudioItem duration])*1000];
-     [(UIWebView*)self.webView stringByEvaluatingJavaScriptFromString:jsString];
+    [self.webViewEngine evaluateJavaScript:jsString completionHandler:^(id event, NSError *err) {}];
     jsString = [NSString stringWithFormat:@"%@.didPlayerReachEnd();", JS_FUNCTION_NAMESPACE];
-    [(UIWebView*)self.webView stringByEvaluatingJavaScriptFromString:jsString];
+    [self.webViewEngine evaluateJavaScript:jsString completionHandler:^(id event, NSError *err) {}];
     
     [self updateMPInfo];
 }
